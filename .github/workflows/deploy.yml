@@ -2,7 +2,7 @@ name: Deploy to Production
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -15,10 +15,23 @@ jobs:
 
       - name: Setup SSH
         run: |
+          set -e
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+
+          if [ -z "${{ secrets.OVH_SSH_KEY }}" ]; then
+            echo "OVH_SSH_KEY is missing"
+            exit 1
+          fi
+
+          if [ -z "${{ secrets.OVH_HOST }}" ]; then
+            echo "OVH_HOST is missing"
+            exit 1
+          fi
+
+          echo "${{ secrets.OVH_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p 22 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+          ssh-keyscan -p 22 ${{ secrets.OVH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Sync files to VPS
         run: |
@@ -27,11 +40,11 @@ jobs:
             --exclude='.github' \
             --exclude='node_modules' \
             --exclude='.env' \
-            ./ ubuntu@${{ secrets.SERVER_HOST }}:/var/www/polaris
+            ./ ubuntu@${{ secrets.OVH_HOST }}:/var/www/polaris
 
       - name: Deploy with Docker Compose
         run: |
-          ssh ubuntu@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh ubuntu@${{ secrets.OVH_HOST }} << 'EOF'
             set -e
             cd /var/www/polaris
             docker compose up -d --build
@@ -41,7 +54,7 @@ jobs:
 
       - name: Health Check
         run: |
-          ssh ubuntu@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh ubuntu@${{ secrets.OVH_HOST }} << 'EOF'
             set -e
             sleep 15
             curl -f http://localhost:3000
