@@ -1,0 +1,48 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p 22 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync files to VPS
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            ./ ubuntu@${{ secrets.SERVER_HOST }}:/var/www/polaris
+
+      - name: Deploy with Docker Compose
+        run: |
+          ssh ubuntu@${{ secrets.SERVER_HOST }} << 'EOF'
+            set -e
+            cd /var/www/polaris
+            docker compose up -d --build
+            docker image prune -f
+            docker compose ps
+          EOF
+
+      - name: Health Check
+        run: |
+          ssh ubuntu@${{ secrets.SERVER_HOST }} << 'EOF'
+            set -e
+            sleep 15
+            curl -f http://localhost:3000
+          EOF
