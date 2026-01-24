@@ -33,23 +33,7 @@ services:
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
     container_name: polaris_app
     restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DB_USER=${DB_USER}
-      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY}
-      - NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-      - RESEND_API_KEY=${RESEND_API_KEY}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
-      - MINIO_PORT=${MINIO_PORT}
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
-      - MINIO_USE_SSL=${MINIO_USE_SSL}
-      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+    env_file: .env
     ports:
       - "3000:3000"
     depends_on:
