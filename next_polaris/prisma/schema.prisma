@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+  STAFF
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum SupportedCurrency {
+  GHS
+}
+
+model User {
+  id           String  @id @default(uuid()) @db.Uuid
+  username     String  @unique
+  email        String  @unique
+  passwordHash String
+  phone        String?
+
+  role UserRole @default(ADMIN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Service {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  description     String?
+  durationMinutes Int
+  price           Decimal  @db.Decimal(10, 2)
+  currency        SupportedCurrency @default(GHS)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bookings Booking[]
+
+  @@map("services")
+}
+
+model Booking {
+  id               String @id @default(uuid()) @db.Uuid
+  bookingReference String @unique
+  clientName       String
+  clientEmail      String
+  clientPhone      String
+
+  serviceId String @db.Uuid 
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  bookingDate DateTime @db.Date
+  bookingTime DateTime @db.Time
+
+  status        BookingStatus
+  paymentStatus PaymentStatus
+  paymentRef    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingDate])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("bookings")
+}
+
+model BusinessHour {
+  id        String   @id @default(uuid()) @db.Uuid
+  dayOfWeek Int // 0 = Sunday ... 6 = Saturday
+  startTime String
+  endTime   String
+  isOpen    Boolean  @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([dayOfWeek])
+  @@map("business_hours")
+}
+
+model BlockedDate {
+  id        String   @id @default(uuid()) @db.Uuid
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([date])
+  @@map("blocked_dates")
+}
