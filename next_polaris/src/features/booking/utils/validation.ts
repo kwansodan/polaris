@@ -1,0 +1,60 @@
+import { z } from "zod";
+
+export const BookingStatusEnum = z.enum([
+  "PENDING",
+  "CONFIRMED",
+  "CANCELLED",
+  "COMPLETED",
+]);
+
+export const PaymentStatusEnum = z.enum([
+  "PENDING",
+  "PAID",
+  "REFUNDED",
+]);
+
+const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+export const BookingInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  clientName: z
+    .string()
+    .min(2, "Client name must be at least 2 characters"),
+
+  clientEmail: z
+    .string()
+    .email("Invalid email address"),
+
+  clientPhone: z
+    .string()
+    .min(7)
+    .max(20),
+
+  bookingReference: z
+    .string(),
+
+  serviceId: z
+    .string()
+    .uuid("Invalid service id"),
+
+  bookingDate: z
+    .string()
+    .regex(dateRegex, "Date must be YYYY-MM-DD"),
+
+  bookingTime: z
+    .string()
+    .regex(timeRegex, "Time must be HH:mm"),
+
+  status: BookingStatusEnum.default("PENDING"),
+
+  paymentStatus: PaymentStatusEnum.default("PENDING"),
+
+  paymentRef: z
+    .string()
+    .optional()
+    .nullable(),
+});
+
+
+export type BookingInput = z.infer<typeof BookingInputSchema>;
+
