@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: ./next_polaris
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./next_polaris:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+    # Command for development (already in Dockerfile.dev but being explicit here if needed)
+    command: npm run dev
