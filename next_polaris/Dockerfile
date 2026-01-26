@@ -1,5 +1,5 @@
 # Multi-stage build for Next.js application
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -8,6 +8,10 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
+# Copy prisma schema if it exists to generate client
+COPY prisma ./prisma/
+
+# Install dependencies including devDeps for build
 RUN npm ci
 
 # Rebuild the source code only when needed
@@ -24,7 +28,8 @@ ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Build the application
+# Generate Prisma client and build the application
+RUN npx prisma generate
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -37,7 +42,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy necessary files
+# Copy necessary files from builder standalone output
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
