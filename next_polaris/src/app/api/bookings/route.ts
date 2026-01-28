@@ -1,0 +1,126 @@
+import { blockedDateRepository } from "@/features/blocked-date/server/blockedDate.repository";
+import { bookingRepository } from "@/features/booking/server/booking.repository";
+import { BookingInputSchema } from "@/features/booking/utils/validation";
+import { businessHourRepository } from "@/features/business-hour/server/businessHour.repository";
+import { serviceRepository } from "@/features/service/server/service.repository";
+import { isTimeWithinRange } from "@/utils/helpers";
+import { NextRequest, NextResponse } from "next/server";
+
+
+
+
+export async function GET(request: NextRequest) {
+  try {
+
+    const searchParams = request.nextUrl.searchParams;
+    const date = searchParams.get('date')
+    let query;
+
+    if (date) {
+      query = {
+        bookingDate: new Date(date)
+      }
+    }
+
+    const bookings = await bookingRepository.getAllBookings(query)
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully queried all bookings`,
+      data: bookings
+    }, { status: 200 })
+  } catch (error: any) {
+    if (error instanceof NextResponse) return error
+    console.error("Error getting all bookings: ", error)
+    return NextResponse.json({ success: false, message: error.message || "Failed to get all bookings" }, { status: 500 })
+  }
+
+}
+
+export async function POST(request: NextRequest) {
+  try {
+
+    const body = await request.json();
+    const validatedBody = BookingInputSchema.parse(body)
+
+    //  validate that body contains a valid serviceId 
+    const existingService = await serviceRepository.findById(validatedBody.serviceId);
+
+    if (!existingService) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid serviceId provided' },
+        { status: 409 })
+    }
+
+    // check if date is blocked
+    const blocked = await blockedDateRepository.findByDate(
+      new Date(validatedBody.bookingDate).toString()
+    )
+
+    if (blocked) {
+      return NextResponse.json(
+        { success: false, error: "Selected date is blocked" },
+        { status: 409 }
+      )
+    }
+
+
+    const bookingDateObj = new Date(validatedBody.bookingDate)
+    const dayOfWeek = bookingDateObj.getUTCDay() // 0-6
+
+    const businessHour = await businessHourRepository.findByDayOfWeek(dayOfWeek)
+
+    if (!businessHour || !businessHour.isOpen) {
+      return NextResponse.json(
+        { success: false, error: "Business is closed on this day" },
+        { status: 409 }
+      )
+    }
+
+    if (
+      !isTimeWithinRange(
+        validatedBody.bookingTime,
+        businessHour.startTime,
+        businessHour.endTime
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Booking time is outside business hours"
+        },
+        { status: 409 }
+      )
+    }
+
+    // check if booking already exists for chosen date or time
+    const isAvailable = await bookingRepository.isSlotAvailable(
+      new Date(validatedBody.bookingDate),
+      validatedBody.bookingTime,
+      validatedBody.serviceId
+    )
+
+    if (!isAvailable) {
+      return NextResponse.json(
+        { success: false, error: 'Booking already exists for slot' },
+        { status: 409 })
+    }
+
+
+    const createdBooking = await bookingRepository.upsertBooking({
+      ...validatedBody,
+    })
+
+    return NextResponse.json({ successs: true, message: "Successfully created booking!", data: createdBooking }, { status: 200 })
+  } catch (error: any) {
+    if (error instanceof NextResponse) return error
+    if (error.name === "ValidationError") {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.errors },
+        { status: 400 }
+      )
+    }
+    console.error("Error creating booking: ", error)
+    return NextResponse.json({ success: false, message: error.message || "Failed to create booking" }, { status: 500 })
+  }
+}
