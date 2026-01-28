@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { Booking, BookingStatus, PaymentStatus, Prisma } from "@generated/prisma/client";
 import { BookingInput } from "../utils/validation";
+import { generateBookingReference } from "@/utils/helpers";
 
 
-class BookingRepository {
+export class BookingRepository {
 
   async upsertBooking(upsertDTO: BookingInput): Promise<Booking> {
+    const bookingReference = generateBookingReference()
+
     const upsertedBooking = await prisma.booking.upsert({
       where: {
         bookingReference: upsertDTO.bookingReference,
@@ -25,7 +28,7 @@ class BookingRepository {
         paymentStatus: upsertDTO.paymentStatus,
       },
       create: {
-        bookingReference: upsertDTO.bookingReference,
+        bookingReference: bookingReference,
         clientName: upsertDTO.clientName,
         clientEmail: upsertDTO.clientEmail,
         clientPhone: upsertDTO.clientPhone,
@@ -73,6 +76,26 @@ class BookingRepository {
     })
   }
 
+  async isSlotAvailable(
+    date: Date,
+    time: string,
+    serviceId: string
+  ): Promise<boolean> {
+    const existingBooking = await prisma.booking.findFirst({
+      where: {
+        bookingDate: date,
+        bookingTime: time,
+        serviceId,
+        status: {
+          in: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
+        },
+      },
+    })
+
+    return !existingBooking
+  }
+
+
   async updateStatus(id: string, status: BookingStatus) {
     return prisma.booking.update({
       where: { id },
@@ -87,7 +110,13 @@ class BookingRepository {
     return this.updateStatus(id, BookingStatus.CANCELLED)
   }
 
-  async delete(id: string) {
-    return this.cancel(id)
+  async deleteById(id: string) {
+    return prisma.booking.delete({
+      where: {
+        id
+      }
+    })
   }
 }
+
+export const bookingRepository = new BookingRepository();
